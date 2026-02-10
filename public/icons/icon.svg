@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="96" fill="#2563eb"/>
+  <g transform="translate(256, 256)">
+    <!-- Dumbbell icon -->
+    <rect x="-140" y="-20" width="280" height="40" rx="8" fill="white"/>
+    <!-- Left weight -->
+    <rect x="-170" y="-60" width="40" height="120" rx="8" fill="white"/>
+    <rect x="-190" y="-45" width="30" height="90" rx="6" fill="white"/>
+    <!-- Right weight -->
+    <rect x="130" y="-60" width="40" height="120" rx="8" fill="white"/>
+    <rect x="160" y="-45" width="30" height="90" rx="6" fill="white"/>
+  </g>
+</svg>
