@@ -13,12 +13,12 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
     const { id: workoutId } = await params;
     const body = await request.json();
-    const { exerciseId, notes } = body;
+    const { exerciseId, notes, supersetGroupId } = body;
 
     if (!exerciseId) {
       return NextResponse.json(
         { error: "Exercise ID is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -34,6 +34,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         exerciseId,
         order: (maxOrder._max.order ?? -1) + 1,
         notes: notes || null,
+        supersetGroupId: supersetGroupId ?? null,
       },
       include: {
         exercise: true,
@@ -46,7 +47,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     console.error("Failed to add exercise to workout:", error);
     return NextResponse.json(
       { error: "Failed to add exercise to workout" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

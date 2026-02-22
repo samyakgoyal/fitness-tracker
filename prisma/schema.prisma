@@ -109,11 +109,12 @@ model Workout {
 
 // An exercise performed within a workout
 model WorkoutExercise {
-  id        String   @id @default(cuid())
-  order     Int
-  notes     String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id              String   @id @default(cuid())
+  order           Int
+  notes           String?
+  supersetGroupId Int?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   workoutId  String
   workout    Workout  @relation(fields: [workoutId], references: [id], onDelete: Cascade)
@@ -152,8 +153,9 @@ model WorkoutTemplate {
 
 // An exercise within a template
 model TemplateExercise {
-  id         String   @id @default(cuid())
-  order      Int
+  id              String   @id @default(cuid())
+  order           Int
+  supersetGroupId Int?
 
   templateId String
   template   WorkoutTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)

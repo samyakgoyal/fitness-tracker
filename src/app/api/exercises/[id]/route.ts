@@ -16,10 +16,13 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       where: { id },
     });
 
-    if (!exercise) {
+    if (
+      !exercise ||
+      (exercise.userId !== null && exercise.userId !== session.user.id)
+    ) {
       return NextResponse.json(
         { error: "Exercise not found" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -28,7 +31,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     console.error("Failed to fetch exercise:", error);
     return NextResponse.json(
       { error: "Failed to fetch exercise" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -41,13 +44,22 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     const { id } = await params;
+
+    const existing = await prisma.exercise.findUnique({ where: { id } });
+    if (!existing || existing.userId !== session.user.id) {
+      return NextResponse.json(
+        { error: "Exercise not found" },
+        { status: 404 },
+      );
+    }
+
     const body = await request.json();
     const { name, muscleGroup, equipment, notes } = body;
 
     if (!name || typeof name !== "string" || name.trim() === "") {
       return NextResponse.json(
         { error: "Exercise name is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -64,17 +76,9 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json(exercise);
   } catch (error) {
     console.error("Failed to update exercise:", error);
-
-    if (error instanceof Error && error.message.includes("Record to update not found")) {
-      return NextResponse.json(
-        { error: "Exercise not found" },
-        { status: 404 }
-      );
-    }
-
     return NextResponse.json(
       { error: "Failed to update exercise" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -87,6 +91,15 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     const { id } = await params;
+
+    const existing = await prisma.exercise.findUnique({ where: { id } });
+    if (!existing || existing.userId !== session.user.id) {
+      return NextResponse.json(
+        { error: "Exercise not found" },
+        { status: 404 },
+      );
+    }
+
     await prisma.exercise.delete({
       where: { id },
     });
@@ -94,17 +107,9 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Failed to delete exercise:", error);
-
-    if (error instanceof Error && error.message.includes("Record to delete does not exist")) {
-      return NextResponse.json(
-        { error: "Exercise not found" },
-        { status: 404 }
-      );
-    }
-
     return NextResponse.json(
       { error: "Failed to delete exercise" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

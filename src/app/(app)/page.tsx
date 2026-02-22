@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -12,7 +13,10 @@ import {
   Plus,
   ChevronRight,
   Calendar,
+  Sparkles,
+  Loader2,
 } from "lucide-react";
+import { useWorkoutStore } from "@/lib/hooks/use-workout-store";
 
 interface Stats {
   totalWorkouts: number;
@@ -86,9 +90,43 @@ function StatCard({
 }
 
 export default function Dashboard() {
+  const router = useRouter();
   const [stats, setStats] = useState<Stats | null>(null);
   const [recent, setRecent] = useState<RecentWorkout[]>([]);
   const [loading, setLoading] = useState(true);
+  const [sampleLoading, setSampleLoading] = useState(false);
+  const startWorkout = useWorkoutStore((s) => s.startWorkout);
+  const addExercise = useWorkoutStore((s) => s.addExercise);
+
+  const handleSampleWorkout = async () => {
+    setSampleLoading(true);
+    try {
+      const res = await fetch("/api/exercises");
+      const exercises = await res.json();
+      if (!Array.isArray(exercises)) return;
+
+      const sampleNames = ["Bench Press", "Overhead Press", "Cable Fly"];
+      startWorkout("Sample Push Day");
+      for (const name of sampleNames) {
+        const match = exercises.find(
+          (e: { name: string }) => e.name.toLowerCase() === name.toLowerCase(),
+        );
+        if (match) {
+          addExercise({
+            exerciseId: match.id,
+            exerciseName: match.name,
+            muscleGroup: match.muscleGroup || "other",
+          });
+        }
+      }
+      router.push("/workouts/new");
+    } catch {
+      // Fall back to empty workout
+      router.push("/workouts/new");
+    } finally {
+      setSampleLoading(false);
+    }
+  };
 
   useEffect(() => {
     async function fetchData() {
@@ -133,12 +171,8 @@ export default function Dashboard() {
     <div className="space-y-6 animate-fade-in">
       {/* Greeting */}
       <div>
-        <h1 className="text-2xl md:text-3xl font-bold">
-          {getGreeting()}
-        </h1>
-        <p className="text-muted-foreground mt-1">
-          Ready to crush it today?
-        </p>
+        <h1 className="text-2xl md:text-3xl font-bold">{getGreeting()}</h1>
+        <p className="text-muted-foreground mt-1">Ready to crush it today?</p>
       </div>
 
       {/* Stats Row */}
@@ -231,20 +265,41 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Empty State */}
+      {/* Empty State / Onboarding */}
       {recent.length === 0 && !loading && (
-        <Card>
-          <CardContent className="py-12 text-center">
-            <Dumbbell className="h-12 w-12 mx-auto text-muted-foreground/50 mb-4" />
-            <p className="text-muted-foreground mb-4">
-              No workouts logged yet. Start your fitness journey!
+        <Card className="border-primary/20">
+          <CardContent className="py-8 text-center">
+            <div className="mx-auto mb-4 h-14 w-14 rounded-2xl gradient-primary flex items-center justify-center shadow-lg shadow-primary/25">
+              <Dumbbell className="h-7 w-7 text-white" />
+            </div>
+            <h2 className="text-lg font-bold mb-1">Welcome to FitTrack!</h2>
+            <p className="text-sm text-muted-foreground mb-6">
+              Start tracking your workouts and watch your progress grow.
             </p>
-            <Button asChild className="gradient-primary border-0 text-white">
-              <Link href="/workouts/new">
-                <Plus className="h-4 w-4 mr-2" />
-                Log First Workout
-              </Link>
-            </Button>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+              <Button
+                asChild
+                className="gradient-primary border-0 text-white w-full sm:w-auto"
+              >
+                <Link href="/workouts/new">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Start Empty Workout
+                </Link>
+              </Button>
+              <Button
+                variant="outline"
+                className="w-full sm:w-auto"
+                onClick={handleSampleWorkout}
+                disabled={sampleLoading}
+              >
+                {sampleLoading ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Sparkles className="h-4 w-4 mr-2" />
+                )}
+                Try Sample Workout
+              </Button>
+            </div>
           </CardContent>
         </Card>
       )}

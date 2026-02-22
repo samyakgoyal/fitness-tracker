@@ -7,10 +7,14 @@ import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 
 const providers: NextAuthConfig["providers"] = [
-  GitHub({
-    clientId: process.env.GITHUB_ID!,
-    clientSecret: process.env.GITHUB_SECRET!,
-  }),
+  ...(process.env.GITHUB_ID && process.env.GITHUB_SECRET
+    ? [
+        GitHub({
+          clientId: process.env.GITHUB_ID,
+          clientSecret: process.env.GITHUB_SECRET,
+        }),
+      ]
+    : []),
   Credentials({
     id: "credentials",
     name: "Email",
@@ -32,16 +36,15 @@ const providers: NextAuthConfig["providers"] = [
       return { id: user.id, email: user.email, name: user.name };
     },
   }),
+  ...(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET
+    ? [
+        Google({
+          clientId: process.env.GOOGLE_CLIENT_ID,
+          clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+        }),
+      ]
+    : []),
 ];
-
-if (process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
-  providers.push(
-    Google({
-      clientId: process.env.GOOGLE_CLIENT_ID,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-    })
-  );
-}
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(prisma),

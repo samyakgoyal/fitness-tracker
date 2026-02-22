@@ -13,7 +13,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const { id } = await params;
 
     const workoutExercises = await prisma.workoutExercise.findMany({
-      where: { exerciseId: id },
+      where: { exerciseId: id, workout: { userId: session.user.id } },
       orderBy: { workout: { date: "desc" } },
       take: 50,
       include: {
@@ -49,7 +49,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     console.error("Failed to fetch exercise history:", error);
     return NextResponse.json(
       { error: "Failed to fetch exercise history" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

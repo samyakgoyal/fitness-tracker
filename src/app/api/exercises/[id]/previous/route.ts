@@ -18,6 +18,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const workoutExercise = await prisma.workoutExercise.findFirst({
       where: {
         exerciseId,
+        workout: { userId: session.user.id },
         ...(excludeWorkoutId ? { workoutId: { not: excludeWorkoutId } } : {}),
       },
       orderBy: { workout: { date: "desc" } },
@@ -42,7 +43,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     console.error("Failed to fetch previous exercise data:", error);
     return NextResponse.json(
       { error: "Failed to fetch previous exercise data" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

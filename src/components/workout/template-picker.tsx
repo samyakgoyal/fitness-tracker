@@ -2,7 +2,12 @@
 
 import { useState, useEffect } from "react";
 import { Dumbbell, FileText, Loader2 } from "lucide-react";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 
@@ -11,6 +16,7 @@ interface Template {
   name: string;
   exercises: {
     id: string;
+    supersetGroupId?: number | null;
     exercise: {
       id: string;
       name: string;
@@ -25,7 +31,11 @@ interface TemplatePickerProps {
   onSelect: (template: Template) => void;
 }
 
-export function TemplatePicker({ open, onClose, onSelect }: TemplatePickerProps) {
+export function TemplatePicker({
+  open,
+  onClose,
+  onSelect,
+}: TemplatePickerProps) {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -83,7 +93,11 @@ export function TemplatePicker({ open, onClose, onSelect }: TemplatePickerProps)
                 </div>
                 <div className="flex flex-wrap gap-1">
                   {template.exercises.map((te) => (
-                    <Badge key={te.id} variant="secondary" className="text-[10px]">
+                    <Badge
+                      key={te.id}
+                      variant="secondary"
+                      className="text-[10px]"
+                    >
                       {te.exercise.name}
                     </Badge>
                   ))}

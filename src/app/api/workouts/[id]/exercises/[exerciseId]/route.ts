@@ -11,18 +11,28 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    const { exerciseId } = await params;
+    const { id: workoutId, exerciseId } = await params;
 
-    await prisma.workoutExercise.delete({
-      where: { id: exerciseId },
+    const result = await prisma.workoutExercise.deleteMany({
+      where: {
+        id: exerciseId,
+        workout: { id: workoutId, userId: session.user.id },
+      },
     });
+
+    if (result.count === 0) {
+      return NextResponse.json(
+        { error: "Exercise not found" },
+        { status: 404 },
+      );
+    }
 
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Failed to remove exercise from workout:", error);
     return NextResponse.json(
       { error: "Failed to remove exercise from workout" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

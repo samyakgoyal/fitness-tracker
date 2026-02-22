@@ -2,11 +2,21 @@
 
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, Dumbbell, Loader2, Trash2 } from "lucide-react";
+import { ArrowLeft, Dumbbell, Loader2, Trash2, TrendingUp } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Line,
+  ComposedChart,
+} from "recharts";
 import {
   Dialog,
   DialogContent,
@@ -91,8 +101,35 @@ export default function ExerciseDetailPage() {
       }
       return best;
     },
-    null as { weight: number; reps: number | null; date: string } | null
+    null as { weight: number; reps: number | null; date: string } | null,
   );
+
+  // Compute chart data: best working set weight + estimated 1RM per session
+  const chartData = [...history]
+    .reverse()
+    .map((entry) => {
+      const workingSets = entry.sets.filter((s) => !s.isWarmup && s.weight);
+      if (workingSets.length === 0) return null;
+      const bestSet = workingSets.reduce((best, s) =>
+        (s.weight || 0) > (best.weight || 0) ? s : best,
+      );
+      const weight = bestSet.weight || 0;
+      const reps = bestSet.reps || 1;
+      const estimated1RM = Math.round(weight * (1 + reps / 30));
+      return {
+        date: new Date(entry.date).toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+        }),
+        weight,
+        estimated1RM,
+      };
+    })
+    .filter(Boolean) as {
+    date: string;
+    weight: number;
+    estimated1RM: number;
+  }[];
 
   if (loading) {
     return (
@@ -108,7 +145,11 @@ export default function ExerciseDetailPage() {
     return (
       <div className="py-12 text-center">
         <p className="text-muted-foreground">Exercise not found</p>
-        <Button variant="ghost" className="mt-4" onClick={() => router.push("/exercises")}>
+        <Button
+          variant="ghost"
+          className="mt-4"
+          onClick={() => router.push("/exercises")}
+        >
           <ArrowLeft className="h-4 w-4 mr-1.5" />
           Back to exercises
         </Button>
@@ -172,6 +213,98 @@ export default function ExerciseDetailPage() {
             <p className="text-xs text-muted-foreground mt-0.5">
               {new Date(pr.date).toLocaleDateString()}
             </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Progress Chart */}
+      {chartData.length >= 2 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <TrendingUp className="h-4 w-4 text-primary" />
+              Progress
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="h-48 -mx-2">
+              <ResponsiveContainer width="100%" height="100%">
+                <ComposedChart data={chartData}>
+                  <defs>
+                    <linearGradient
+                      id="weightGradient"
+                      x1="0"
+                      y1="0"
+                      x2="0"
+                      y2="1"
+                    >
+                      <stop
+                        offset="5%"
+                        stopColor="hsl(var(--primary))"
+                        stopOpacity={0.3}
+                      />
+                      <stop
+                        offset="95%"
+                        stopColor="hsl(var(--primary))"
+                        stopOpacity={0}
+                      />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid
+                    strokeDasharray="3 3"
+                    stroke="hsl(var(--border))"
+                    vertical={false}
+                  />
+                  <XAxis
+                    dataKey="date"
+                    tick={{
+                      fontSize: 10,
+                      fill: "hsl(var(--muted-foreground))",
+                    }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <YAxis
+                    tick={{
+                      fontSize: 10,
+                      fill: "hsl(var(--muted-foreground))",
+                    }}
+                    axisLine={false}
+                    tickLine={false}
+                    width={40}
+                    domain={["dataMin - 5", "dataMax + 5"]}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "hsl(var(--card))",
+                      border: "1px solid hsl(var(--border))",
+                      borderRadius: "0.5rem",
+                      fontSize: "12px",
+                    }}
+                    formatter={(v, name) => [
+                      `${Number(v)} kg`,
+                      name === "weight" ? "Best Set" : "Est. 1RM",
+                    ]}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="weight"
+                    stroke="hsl(var(--primary))"
+                    strokeWidth={2}
+                    fill="url(#weightGradient)"
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="estimated1RM"
+                    stroke="hsl(var(--primary))"
+                    strokeWidth={1.5}
+                    strokeDasharray="4 4"
+                    dot={false}
+                    opacity={0.5}
+                  />
+                </ComposedChart>
+              </ResponsiveContainer>
+            </div>
           </CardContent>
         </Card>
       )}

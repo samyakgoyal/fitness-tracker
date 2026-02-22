@@ -8,6 +8,8 @@ import {
   Plus,
   Trash2,
   MessageSquare,
+  Link2,
+  Unlink,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -19,7 +21,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { SetRow } from "./set-row";
-import { useWorkoutStore, type WorkoutSet } from "@/lib/hooks/use-workout-store";
+import {
+  useWorkoutStore,
+  type WorkoutSet,
+} from "@/lib/hooks/use-workout-store";
 
 interface ExerciseCardProps {
   exerciseIndex: number;
@@ -44,6 +49,8 @@ export function ExerciseCard({
   const startRestTimer = useWorkoutStore((s) => s.startRestTimer);
   const restTimerSeconds = useWorkoutStore((s) => s.restTimerSeconds);
   const workoutId = useWorkoutStore((s) => s.workoutId);
+  const groupExercises = useWorkoutStore((s) => s.groupExercises);
+  const ungroupExercise = useWorkoutStore((s) => s.ungroupExercise);
 
   const exercise = exercises[exerciseIndex];
   const [showNotes, setShowNotes] = useState(false);
@@ -51,19 +58,19 @@ export function ExerciseCard({
   // Fetch ghost values (previous workout data) for this exercise
   useEffect(() => {
     if (!exercise?.exerciseId) return;
-    const excludeParam = workoutId
-      ? `?excludeWorkoutId=${workoutId}`
-      : "";
+    const excludeParam = workoutId ? `?excludeWorkoutId=${workoutId}` : "";
     fetch(`/api/exercises/${exercise.exerciseId}/previous${excludeParam}`)
       .then((r) => r.json())
       .then((data) => {
         if (data?.sets) {
           setGhostValues(
             exerciseIndex,
-            data.sets.map((s: { weight: number | null; reps: number | null }) => ({
-              weight: s.weight,
-              reps: s.reps,
-            }))
+            data.sets.map(
+              (s: { weight: number | null; reps: number | null }) => ({
+                weight: s.weight,
+                reps: s.reps,
+              }),
+            ),
           );
         }
       })
@@ -72,14 +79,29 @@ export function ExerciseCard({
 
   if (!exercise) return null;
 
-  const completedSets = exercise.sets.filter((s) => s.completed && !s.isWarmup).length;
+  const completedSets = exercise.sets.filter(
+    (s) => s.completed && !s.isWarmup,
+  ).length;
   const totalSets = exercise.sets.filter((s) => !s.isWarmup).length;
+
+  const isInSuperset = exercise.supersetGroupId !== null;
+  const isLastInSuperset =
+    isInSuperset &&
+    (exerciseIndex === exercises.length - 1 ||
+      exercises[exerciseIndex + 1]?.supersetGroupId !==
+        exercise.supersetGroupId);
+  const canSuperset =
+    !isLast &&
+    exercise.supersetGroupId === null &&
+    exercises[exerciseIndex + 1]?.supersetGroupId === null;
 
   const handleToggleComplete = (setIndex: number) => {
     const set = exercise.sets[setIndex];
     if (!set.completed) {
-      // Auto-start rest timer when completing a set
-      startRestTimer(restTimerSeconds);
+      // In a superset, only start rest timer on the last exercise in the group
+      if (!isInSuperset || isLastInSuperset) {
+        startRestTimer(restTimerSeconds);
+      }
     }
     toggleSetComplete(exerciseIndex, setIndex);
   };
@@ -116,7 +138,9 @@ export function ExerciseCard({
               </DropdownMenuItem>
               {!isFirst && (
                 <DropdownMenuItem
-                  onClick={() => reorderExercise(exerciseIndex, exerciseIndex - 1)}
+                  onClick={() =>
+                    reorderExercise(exerciseIndex, exerciseIndex - 1)
+                  }
                 >
                   <ChevronUp className="h-4 w-4 mr-2" />
                   Move up
@@ -124,10 +148,30 @@ export function ExerciseCard({
               )}
               {!isLast && (
                 <DropdownMenuItem
-                  onClick={() => reorderExercise(exerciseIndex, exerciseIndex + 1)}
+                  onClick={() =>
+                    reorderExercise(exerciseIndex, exerciseIndex + 1)
+                  }
                 >
                   <ChevronDown className="h-4 w-4 mr-2" />
                   Move down
+                </DropdownMenuItem>
+              )}
+              {canSuperset && (
+                <DropdownMenuItem
+                  onClick={() =>
+                    groupExercises([exerciseIndex, exerciseIndex + 1])
+                  }
+                >
+                  <Link2 className="h-4 w-4 mr-2" />
+                  Superset with next
+                </DropdownMenuItem>
+              )}
+              {isInSuperset && (
+                <DropdownMenuItem
+                  onClick={() => ungroupExercise(exerciseIndex)}
+                >
+                  <Unlink className="h-4 w-4 mr-2" />
+                  Remove from superset
                 </DropdownMenuItem>
               )}
               <DropdownMenuItem

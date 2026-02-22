@@ -16,7 +16,9 @@ export async function GET() {
         exercises: {
           orderBy: { order: "asc" },
           include: {
-            exercise: { select: { id: true, name: true, muscleGroup: true } },
+            exercise: {
+              select: { id: true, name: true, muscleGroup: true },
+            },
           },
         },
       },
@@ -26,7 +28,7 @@ export async function GET() {
     console.error("Failed to fetch templates:", error);
     return NextResponse.json(
       { error: "Failed to fetch templates" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -39,27 +41,41 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { name, exerciseIds } = body as {
+    const {
+      name,
+      exerciseIds,
+      exercises: exercisesInput,
+    } = body as {
       name: string;
-      exerciseIds: string[];
+      exerciseIds?: string[];
+      exercises?: { exerciseId: string; supersetGroupId?: number | null }[];
     };
 
     if (!name?.trim()) {
       return NextResponse.json(
         { error: "Template name is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
+
+    // Support both legacy exerciseIds array and new exercises array with supersetGroupId
+    const exerciseData = exercisesInput
+      ? exercisesInput.map((e, index) => ({
+          exerciseId: e.exerciseId,
+          order: index,
+          supersetGroupId: e.supersetGroupId ?? null,
+        }))
+      : (exerciseIds || []).map((exerciseId, index) => ({
+          exerciseId,
+          order: index,
+        }));
 
     const template = await prisma.workoutTemplate.create({
       data: {
         name: name.trim(),
         userId: session.user.id,
         exercises: {
-          create: exerciseIds.map((exerciseId, index) => ({
-            exerciseId,
-            order: index,
-          })),
+          create: exerciseData,
         },
       },
       include: {
@@ -77,7 +93,7 @@ export async function POST(request: NextRequest) {
     console.error("Failed to create template:", error);
     return NextResponse.json(
       { error: "Failed to create template" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

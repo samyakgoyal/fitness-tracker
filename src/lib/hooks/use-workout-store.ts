@@ -20,6 +20,7 @@ export interface WorkoutExercise {
   muscleGroup: string;
   sets: WorkoutSet[];
   notes: string;
+  supersetGroupId: number | null;
 }
 
 interface WorkoutState {
@@ -53,14 +54,18 @@ interface WorkoutState {
   updateSet: (
     exerciseIndex: number,
     setIndex: number,
-    data: Partial<WorkoutSet>
+    data: Partial<WorkoutSet>,
   ) => void;
   toggleSetComplete: (exerciseIndex: number, setIndex: number) => void;
   setExerciseNotes: (exerciseIndex: number, notes: string) => void;
   setGhostValues: (
     exerciseIndex: number,
-    sets: { weight: number | null; reps: number | null }[]
+    sets: { weight: number | null; reps: number | null }[],
   ) => void;
+
+  // Superset actions
+  groupExercises: (indices: number[]) => void;
+  ungroupExercise: (exerciseIndex: number) => void;
 
   // Rest timer actions
   startRestTimer: (seconds: number) => void;
@@ -126,6 +131,7 @@ export const useWorkoutStore = create<WorkoutState>()(
               muscleGroup,
               sets: [createEmptySet()],
               notes: "",
+              supersetGroupId: null,
             },
           ],
         })),
@@ -212,6 +218,40 @@ export const useWorkoutStore = create<WorkoutState>()(
           return { exercises };
         }),
 
+      groupExercises: (indices) =>
+        set((state) => {
+          const exercises = [...state.exercises];
+          const usedIds = exercises
+            .map((e) => e.supersetGroupId)
+            .filter((id): id is number => id !== null);
+          const nextGroupId = usedIds.length > 0 ? Math.max(...usedIds) + 1 : 1;
+          for (const i of indices) {
+            exercises[i] = { ...exercises[i], supersetGroupId: nextGroupId };
+          }
+          return { exercises };
+        }),
+
+      ungroupExercise: (exerciseIndex) =>
+        set((state) => {
+          const exercises = [...state.exercises];
+          const groupId = exercises[exerciseIndex].supersetGroupId;
+          exercises[exerciseIndex] = {
+            ...exercises[exerciseIndex],
+            supersetGroupId: null,
+          };
+          // If only one member remains in the group, ungroup it too
+          if (groupId !== null) {
+            const remaining = exercises.filter(
+              (e) => e.supersetGroupId === groupId,
+            );
+            if (remaining.length === 1) {
+              const idx = exercises.indexOf(remaining[0]);
+              exercises[idx] = { ...exercises[idx], supersetGroupId: null };
+            }
+          }
+          return { exercises };
+        }),
+
       startRestTimer: (seconds) =>
         set({
           restTimerSeconds: seconds,
@@ -266,6 +306,6 @@ export const useWorkoutStore = create<WorkoutState>()(
         notes: state.notes,
         restTimerSeconds: state.restTimerSeconds,
       }),
-    }
-  )
+    },
+  ),
 );

@@ -58,7 +58,7 @@ export function WorkoutLogger() {
       setElapsed(
         h > 0
           ? `${h}:${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`
-          : `${m}:${s.toString().padStart(2, "0")}`
+          : `${m}:${s.toString().padStart(2, "0")}`,
       );
     };
     tick();
@@ -74,19 +74,27 @@ export function WorkoutLogger() {
   }, [isActive, startWorkout]);
 
   const handleAddExercise = useCallback(
-    (exercise: { exerciseId: string; exerciseName: string; muscleGroup: string }) => {
+    (exercise: {
+      exerciseId: string;
+      exerciseName: string;
+      muscleGroup: string;
+    }) => {
       addExercise(exercise);
     },
-    [addExercise]
+    [addExercise],
   );
+
+  const groupExercises = useWorkoutStore((s) => s.groupExercises);
 
   const handleTemplateSelect = useCallback(
     (template: {
       name: string;
       exercises: {
+        supersetGroupId?: number | null;
         exercise: { id: string; name: string; muscleGroup: string | null };
       }[];
     }) => {
+      const baseIndex = exercises.length;
       setWorkoutName(template.name);
       for (const te of template.exercises) {
         addExercise({
@@ -95,9 +103,23 @@ export function WorkoutLogger() {
           muscleGroup: te.exercise.muscleGroup || "other",
         });
       }
+      // Restore superset groups from template
+      const groups = new Map<number, number[]>();
+      template.exercises.forEach((te, i) => {
+        if (te.supersetGroupId != null) {
+          const arr = groups.get(te.supersetGroupId) || [];
+          arr.push(baseIndex + i);
+          groups.set(te.supersetGroupId, arr);
+        }
+      });
+      Array.from(groups.values()).forEach((indices) => {
+        if (indices.length >= 2) {
+          groupExercises(indices);
+        }
+      });
       toast.success(`Loaded template: ${template.name}`);
     },
-    [setWorkoutName, addExercise]
+    [exercises.length, setWorkoutName, addExercise, groupExercises],
   );
 
   const handleFinishWorkout = useCallback(async () => {
@@ -112,7 +134,9 @@ export function WorkoutLogger() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: workoutName || null,
-          date: startTime ? new Date(startTime).toISOString() : new Date().toISOString(),
+          date: startTime
+            ? new Date(startTime).toISOString()
+            : new Date().toISOString(),
         }),
       });
 
@@ -132,6 +156,7 @@ export function WorkoutLogger() {
           body: JSON.stringify({
             exerciseId: exercise.exerciseId,
             notes: exercise.notes || null,
+            supersetGroupId: exercise.supersetGroupId,
           }),
         });
 
@@ -151,7 +176,7 @@ export function WorkoutLogger() {
                 rpe: set.rpe,
                 isWarmup: set.isWarmup,
               }),
-            }
+            },
           );
         }
       }
@@ -165,7 +190,7 @@ export function WorkoutLogger() {
       });
 
       toast.success("Workout saved!", {
-        description: `${duration} min · ${exercises.filter((e) => e.sets.some((s) => s.completed)).length} exercises`,
+        description: `${duration} min · ${exercises.filter((e) => e.sets.some((s) => s.completed)).length} exercise${exercises.filter((e) => e.sets.some((s) => s.completed)).length !== 1 ? "s" : ""}`,
       });
 
       router.push(`/workouts/${workoutId}`);
@@ -190,7 +215,7 @@ export function WorkoutLogger() {
 
   const completedSetsCount = exercises.reduce(
     (acc, e) => acc + e.sets.filter((s) => s.completed).length,
-    0
+    0,
   );
 
   const totalVolume = exercises.reduce(
@@ -199,7 +224,7 @@ export function WorkoutLogger() {
       e.sets
         .filter((s) => s.completed && !s.isWarmup)
         .reduce((sum, s) => sum + (s.weight || 0) * (s.reps || 0), 0),
-    0
+    0,
   );
 
   return (
@@ -225,8 +250,12 @@ export function WorkoutLogger() {
 
         {/* Stats row */}
         <div className="flex items-center gap-4 mt-1 text-xs text-muted-foreground">
-          <span>{exercises.length} exercises</span>
-          <span>{completedSetsCount} sets</span>
+          <span>
+            {exercises.length} exercise{exercises.length !== 1 ? "s" : ""}
+          </span>
+          <span>
+            {completedSetsCount} set{completedSetsCount !== 1 ? "s" : ""}
+          </span>
           {totalVolume > 0 && (
             <span>{totalVolume.toLocaleString()} kg volume</span>
           )}
@@ -235,14 +264,42 @@ export function WorkoutLogger() {
 
       {/* Exercise list */}
       <div className="space-y-3">
-        {exercises.map((_, i) => (
-          <ExerciseCard
-            key={exercises[i].id}
-            exerciseIndex={i}
-            isFirst={i === 0}
-            isLast={i === exercises.length - 1}
-          />
-        ))}
+        {exercises.map((ex, i) => {
+          const groupId = ex.supersetGroupId;
+          const isGroupStart =
+            groupId !== null &&
+            (i === 0 || exercises[i - 1].supersetGroupId !== groupId);
+          const isGroupEnd =
+            groupId !== null &&
+            (i === exercises.length - 1 ||
+              exercises[i + 1].supersetGroupId !== groupId);
+
+          return (
+            <div key={ex.id}>
+              {isGroupStart && (
+                <div className="flex items-center gap-2 mb-1 ml-1">
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-primary">
+                    Superset
+                  </span>
+                  <div className="flex-1 h-px bg-primary/20" />
+                </div>
+              )}
+              <div
+                className={
+                  groupId !== null
+                    ? `border-l-2 border-primary/30 pl-2 ${!isGroupEnd ? "-mb-1" : ""}`
+                    : ""
+                }
+              >
+                <ExerciseCard
+                  exerciseIndex={i}
+                  isFirst={i === 0}
+                  isLast={i === exercises.length - 1}
+                />
+              </div>
+            </div>
+          );
+        })}
       </div>
 
       {/* Empty state */}
@@ -257,7 +314,10 @@ export function WorkoutLogger() {
               <Plus className="h-4 w-4 mr-1.5" />
               Add Exercise
             </Button>
-            <Button variant="outline" onClick={() => setShowTemplatePicker(true)}>
+            <Button
+              variant="outline"
+              onClick={() => setShowTemplatePicker(true)}
+            >
               <FileText className="h-4 w-4 mr-1.5" />
               Template
             </Button>
@@ -325,9 +385,15 @@ export function WorkoutLogger() {
           <DialogHeader>
             <DialogTitle>Finish Workout?</DialogTitle>
             <DialogDescription>
-              {completedSetsCount} sets completed across{" "}
+              {completedSetsCount} set{completedSetsCount !== 1 ? "s" : ""}{" "}
+              completed across{" "}
               {exercises.filter((e) => e.sets.some((s) => s.completed)).length}{" "}
-              exercises will be saved.
+              exercise
+              {exercises.filter((e) => e.sets.some((s) => s.completed))
+                .length !== 1
+                ? "s"
+                : ""}{" "}
+              will be saved.
               {exercises.some((e) => e.sets.some((s) => !s.completed)) &&
                 " Incomplete sets will be discarded."}
             </DialogDescription>
@@ -362,7 +428,8 @@ export function WorkoutLogger() {
           <DialogHeader>
             <DialogTitle>Discard Workout?</DialogTitle>
             <DialogDescription>
-              This will delete all progress for this workout. This cannot be undone.
+              This will delete all progress for this workout. This cannot be
+              undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="flex-row gap-2">

@@ -2,13 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
-import {
-  ArrowLeft,
-  Calendar,
-  Dumbbell,
-  Loader2,
-  Trash2,
-} from "lucide-react";
+import { ArrowLeft, Calendar, Dumbbell, Loader2, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -33,6 +27,7 @@ interface WorkoutDetail {
     id: string;
     order: number;
     notes: string | null;
+    supersetGroupId: number | null;
     exercise: {
       id: string;
       name: string;
@@ -119,12 +114,12 @@ export default function WorkoutDetailPage() {
       e.sets
         .filter((s) => !s.isWarmup)
         .reduce((sum, s) => sum + (s.weight || 0) * (s.reps || 0), 0),
-    0
+    0,
   );
 
   const totalSets = workout.exercises.reduce(
     (acc, e) => acc + e.sets.filter((s) => !s.isWarmup).length,
-    0
+    0,
   );
 
   return (
@@ -210,56 +205,87 @@ export default function WorkoutDetailPage() {
 
       {/* Exercises */}
       <div className="space-y-3">
-        {workout.exercises.map((we) => (
-          <Card key={we.id}>
-            <CardContent className="py-3">
-              <div className="flex items-center gap-2 mb-3">
-                <Dumbbell className="h-4 w-4 text-primary" />
-                <h3 className="font-semibold text-sm">{we.exercise.name}</h3>
-                {we.exercise.muscleGroup && (
-                  <Badge variant="secondary" className="text-[10px]">
-                    {we.exercise.muscleGroup}
-                  </Badge>
-                )}
-              </div>
+        {workout.exercises.map((we, i) => {
+          const groupId = we.supersetGroupId;
+          const isGroupStart =
+            groupId !== null &&
+            (i === 0 || workout.exercises[i - 1].supersetGroupId !== groupId);
+          const isGroupEnd =
+            groupId !== null &&
+            (i === workout.exercises.length - 1 ||
+              workout.exercises[i + 1].supersetGroupId !== groupId);
 
-              {/* Set header */}
-              <div className="grid grid-cols-[2.5rem_1fr_1fr_3rem] gap-2 text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-1 px-1">
-                <span>Set</span>
-                <span>Weight</span>
-                <span>Reps</span>
-                <span>RPE</span>
-              </div>
-
-              {/* Sets */}
-              <div className="space-y-0.5">
-                {we.sets.map((set) => (
-                  <div
-                    key={set.id}
-                    className="grid grid-cols-[2.5rem_1fr_1fr_3rem] gap-2 text-sm px-1 py-1 rounded-md"
-                  >
-                    <span className="text-xs text-muted-foreground">
-                      {set.isWarmup ? "W" : set.setNumber}
-                    </span>
-                    <span className="font-medium">
-                      {set.weight != null ? `${set.weight} kg` : "—"}
-                    </span>
-                    <span>{set.reps ?? "—"}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {set.rpe ?? "—"}
-                    </span>
-                  </div>
-                ))}
-              </div>
-
-              {we.notes && (
-                <p className="text-xs text-muted-foreground mt-2 border-t pt-2">
-                  {we.notes}
-                </p>
+          return (
+            <div key={we.id}>
+              {isGroupStart && (
+                <div className="flex items-center gap-2 mb-1 ml-1">
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-primary">
+                    Superset
+                  </span>
+                  <div className="flex-1 h-px bg-primary/20" />
+                </div>
               )}
-            </CardContent>
-          </Card>
-        ))}
+              <div
+                className={
+                  groupId !== null
+                    ? `border-l-2 border-primary/30 pl-2 ${!isGroupEnd ? "-mb-1" : ""}`
+                    : ""
+                }
+              >
+                <Card>
+                  <CardContent className="py-3">
+                    <div className="flex items-center gap-2 mb-3">
+                      <Dumbbell className="h-4 w-4 text-primary" />
+                      <h3 className="font-semibold text-sm">
+                        {we.exercise.name}
+                      </h3>
+                      {we.exercise.muscleGroup && (
+                        <Badge variant="secondary" className="text-[10px]">
+                          {we.exercise.muscleGroup}
+                        </Badge>
+                      )}
+                    </div>
+
+                    {/* Set header */}
+                    <div className="grid grid-cols-[2.5rem_1fr_1fr_3rem] gap-2 text-[10px] font-medium text-muted-foreground uppercase tracking-wider mb-1 px-1">
+                      <span>Set</span>
+                      <span>Weight</span>
+                      <span>Reps</span>
+                      <span>RPE</span>
+                    </div>
+
+                    {/* Sets */}
+                    <div className="space-y-0.5">
+                      {we.sets.map((set) => (
+                        <div
+                          key={set.id}
+                          className="grid grid-cols-[2.5rem_1fr_1fr_3rem] gap-2 text-sm px-1 py-1 rounded-md"
+                        >
+                          <span className="text-xs text-muted-foreground">
+                            {set.isWarmup ? "W" : set.setNumber}
+                          </span>
+                          <span className="font-medium">
+                            {set.weight != null ? `${set.weight} kg` : "—"}
+                          </span>
+                          <span>{set.reps ?? "—"}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {set.rpe ?? "—"}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+
+                    {we.notes && (
+                      <p className="text-xs text-muted-foreground mt-2 border-t pt-2">
+                        {we.notes}
+                      </p>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          );
+        })}
       </div>
 
       {/* Delete dialog */}
