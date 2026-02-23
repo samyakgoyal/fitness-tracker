@@ -4,90 +4,77 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Personal fitness tracking web application for logging gym workouts, tracking exercises, sets, reps, weights, and monitoring progress over time.
-
-## Tech Stack
-
-- **Framework**: Next.js 14 (App Router)
-- **Language**: TypeScript
-- **Styling**: Tailwind CSS
-- **Database**: SQLite with Prisma ORM
-- **Deployment**: Vercel (planned)
+FitTrack — personal fitness tracking PWA for logging gym workouts, tracking exercises/sets/reps/weights, and monitoring progress over time.
 
 ## Commands
 
 ```bash
-# Development
-npm run dev          # Start dev server at http://localhost:3000
+npm run dev              # Dev server at localhost:3000
+npm run build            # prisma generate + next build
+npm run lint             # ESLint
 
-# Build & Production
-npm run build        # Build for production
-npm run start        # Run production build
-
-# Database
-npx prisma migrate dev --name <migration_name>  # Create and apply migration
-npx prisma studio                                # Open database GUI
-npx prisma generate                              # Regenerate Prisma client
-npx prisma db push                               # Push schema changes (dev only)
-
-# Linting
-npm run lint         # Run ESLint
+npx prisma migrate dev --name <name>  # Create and apply migration
+npx prisma studio                      # Database GUI
+npx prisma db push                     # Push schema changes (dev only)
 ```
+
+No test framework is configured.
+
+## Tech Stack
+
+- **Next.js 14** (App Router), TypeScript, Tailwind CSS
+- **Prisma ORM** with SQLite (local) or Turso/libSQL (production via `TURSO_DATABASE_URL`)
+- **NextAuth v5** (beta) — JWT strategy, GitHub + Google OAuth + email/password credentials
+- **Zustand** for client-side workout state (persisted to localStorage as `fittrack-workout`)
+- **shadcn/ui** components (Radix primitives in `src/components/ui/`)
+- **Zod** for API input validation (`src/lib/validations.ts`)
+- **PWA**: service worker (`public/sw.js`), manifest, offline page
 
 ## Architecture
 
-### Database Schema (`prisma/schema.prisma`)
+### Route Groups
 
-```
-User (auth)
-  └── Workout (session)
-        └── WorkoutExercise (exercise in workout)
-              └── Set (individual set with weight/reps)
-  └── Exercise (exercise library)
-```
+- `(auth)` — unauthenticated: `/login`
+- `(app)` — authenticated (behind middleware redirect): all app pages, wraps children in `<Providers>` (SessionProvider) + `<NavBar>` + service worker registration
 
-Key relationships:
-- User owns Workouts and custom Exercises
-- Workout contains WorkoutExercises (ordered)
-- WorkoutExercise links to Exercise and contains Sets
-- Exercise can be global (userId=null) or user-created
+### Auth Flow
 
-### App Structure (`src/app/`)
+- `src/lib/auth.ts` — NextAuth config with PrismaAdapter, JWT callbacks that inject `user.id` into token/session
+- `src/middleware.ts` — protects all routes except `/login`, `/api/auth/*`, and static assets; redirects unauthenticated users to `/login`
+- `src/lib/auth-utils.ts` — `getCurrentUser()` and `requireAuth()` helpers for server-side auth in API routes
+- `src/app/api/auth/signup/route.ts` — email/password registration with bcrypt
 
-| Route | Purpose |
-|-------|---------|
-| `/` | Home/dashboard |
-| `/workouts` | Workout history list |
-| `/workouts/new` | Log new workout |
-| `/workouts/[id]` | View/edit specific workout |
-| `/exercises` | Exercise library management |
-| `/progress` | Stats and progress charts |
+### API Pattern
 
-### Key Files
+All API routes in `src/app/api/` follow the same pattern:
 
-- `src/lib/prisma.ts` - Prisma client singleton (prevents connection exhaustion in dev)
-- `src/app/api/` - API routes (Next.js Route Handlers)
-- `src/components/` - Reusable React components
+1. Call `auth()` to get session
+2. Check `session?.user?.id` (return 401 if missing)
+3. Prisma query scoped to `userId`
+4. Return JSON response
 
-## Data Flow
+Nested REST structure: `/api/workouts/[id]/exercises/[exerciseId]/sets/`
 
-1. **Logging a workout**: Create Workout → Add WorkoutExercises → Add Sets to each
-2. **Exercise lookup**: Check user exercises first, then global exercises
-3. **PR tracking**: Query Sets by exercise, find max weight for given reps
+### Database
 
-## Current Status
+SQLite locally, Turso in production. `src/lib/prisma.ts` auto-detects: if `TURSO_DATABASE_URL` is set, uses `PrismaLibSql` adapter; otherwise plain `PrismaClient`. Global singleton prevents connection exhaustion in dev.
 
-Phase 1 (Foundation) - In Progress:
-- [x] Project setup with Next.js, TypeScript, Tailwind
-- [x] Database schema designed
-- [x] Basic page structure and navigation
-- [ ] User authentication (NextAuth.js)
-- [ ] Exercise CRUD API
-- [ ] Workout logging functionality
+Key schema points:
 
-## Feature Roadmap
+- `Exercise` can be global (`userId=null`, `isCustom=false`) or user-created — unique constraint on `[name, userId]`
+- `WorkoutExercise` has `order` field for drag-to-reorder
+- `Set` tracks `weight`, `reps`, `rpe`, `isWarmup`, `setNumber`
+- `WorkoutTemplate` / `TemplateExercise` for saved routines
 
-1. **Phase 1**: Auth, exercise library, basic workout logging
-2. **Phase 2**: PR tracking, workout history, basic charts
-3. **Phase 3**: Workout templates, rest timer, previous workout comparison
-4. **Phase 4**: Body measurements, calendar view, data export
+### Client-Side Workout State
+
+`src/lib/hooks/use-workout-store.ts` — Zustand store persisted to localStorage. Manages the active workout session: exercises, sets, rest timer, ghost values (previous workout data). This is the source of truth during a workout; data is saved to the API on finish.
+
+### Exercise Database
+
+`src/lib/exerciseDatabase.ts` — large static catalog of exercises with muscle groups, equipment types, and search aliases. Used by the exercise picker for fuzzy matching.
+
+## Environment Variables
+
+Required: `DATABASE_URL`, `NEXTAUTH_SECRET`, `GITHUB_ID`, `GITHUB_SECRET`
+Optional: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`
