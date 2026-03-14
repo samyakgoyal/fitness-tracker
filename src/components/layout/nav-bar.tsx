@@ -23,10 +23,13 @@ const desktopNavItems = [
   { href: "/progress", label: "Progress", icon: TrendingUp },
 ];
 
-const mobileNavItems = [
+const mobileNavItemsLeft = [
   { href: "/", label: "Home", icon: Home },
   { href: "/workouts", label: "History", icon: BookOpen },
-  // FAB goes here
+];
+
+const mobileNavItemsRight = [
+  { href: "/exercises", label: "Exercises", icon: Dumbbell },
   { href: "/calendar", label: "Calendar", icon: CalendarDays },
   { href: "/progress", label: "Progress", icon: TrendingUp },
 ];
@@ -59,7 +62,7 @@ export function NavBar() {
                 "flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
                 isActive(item.href)
                   ? "bg-primary/10 text-primary"
-                  : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                  : "text-muted-foreground hover:text-foreground hover:bg-accent",
               )}
             >
               <item.icon className="h-4 w-4" />
@@ -70,7 +73,11 @@ export function NavBar() {
 
         <div className="flex items-center gap-2">
           <ThemeToggle />
-          <Button asChild size="sm" className="gradient-primary border-0 text-white">
+          <Button
+            asChild
+            size="sm"
+            className="gradient-primary border-0 text-white"
+          >
             <Link href="/workouts/new">
               <Plus className="h-4 w-4 mr-1" />
               Workout
@@ -83,15 +90,13 @@ export function NavBar() {
       {/* Mobile bottom nav */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 border-t bg-background/80 backdrop-blur-sm pb-safe">
         <div className="flex items-center justify-around px-2 py-1">
-          {mobileNavItems.slice(0, 2).map((item) => (
+          {mobileNavItemsLeft.map((item) => (
             <Link
               key={item.href}
               href={item.href}
               className={cn(
-                "flex flex-col items-center gap-0.5 px-3 py-2 text-xs transition-colors min-w-[4rem]",
-                isActive(item.href)
-                  ? "text-primary"
-                  : "text-muted-foreground"
+                "flex flex-col items-center gap-0.5 py-2 text-xs transition-colors min-w-0 flex-1",
+                isActive(item.href) ? "text-primary" : "text-muted-foreground",
               )}
             >
               <item.icon className="h-5 w-5" />
@@ -102,20 +107,18 @@ export function NavBar() {
           {/* Center FAB */}
           <Link
             href="/workouts/new"
-            className="flex items-center justify-center -mt-6 h-14 w-14 rounded-full gradient-primary shadow-lg shadow-primary/25"
+            className="flex items-center justify-center -mt-6 h-12 w-12 rounded-full gradient-primary shadow-lg shadow-primary/25 shrink-0"
           >
-            <Plus className="h-6 w-6 text-white" />
+            <Plus className="h-5 w-5 text-white" />
           </Link>
 
-          {mobileNavItems.slice(2).map((item) => (
+          {mobileNavItemsRight.map((item) => (
             <Link
               key={item.href}
               href={item.href}
               className={cn(
-                "flex flex-col items-center gap-0.5 px-3 py-2 text-xs transition-colors min-w-[4rem]",
-                isActive(item.href)
-                  ? "text-primary"
-                  : "text-muted-foreground"
+                "flex flex-col items-center gap-0.5 py-2 text-xs transition-colors min-w-0 flex-1",
+                isActive(item.href) ? "text-primary" : "text-muted-foreground",
               )}
             >
               <item.icon className="h-5 w-5" />

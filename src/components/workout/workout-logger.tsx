@@ -2,14 +2,21 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { Plus, Trash2, Save, FileText, Loader2 } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
 import {
-  Plus,
-  Trash2,
-  Timer as TimerIcon,
-  Save,
-  FileText,
-  Loader2,
-} from "lucide-react";
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -21,7 +28,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useWorkoutStore } from "@/lib/hooks/use-workout-store";
-import { ExerciseCard } from "./exercise-card";
+import { SortableExerciseCard } from "./sortable-exercise-card";
 import { ExercisePicker } from "./exercise-picker";
 import { RestTimer, RestTimerFAB } from "./rest-timer";
 import { TemplatePicker } from "./template-picker";
@@ -38,6 +45,7 @@ export function WorkoutLogger() {
   const addExercise = useWorkoutStore((s) => s.addExercise);
   const finishWorkout = useWorkoutStore((s) => s.finishWorkout);
   const discardWorkout = useWorkoutStore((s) => s.discardWorkout);
+  const reorderExercise = useWorkoutStore((s) => s.reorderExercise);
 
   const [showExercisePicker, setShowExercisePicker] = useState(false);
   const [showTemplatePicker, setShowTemplatePicker] = useState(false);
@@ -46,6 +54,15 @@ export function WorkoutLogger() {
   const [saving, setSaving] = useState(false);
   const [elapsed, setElapsed] = useState("0:00");
   const saveRef = useRef(false);
+
+  // DnD sensors
+  const pointerSensor = useSensor(PointerSensor, {
+    activationConstraint: { distance: 8 },
+  });
+  const touchSensor = useSensor(TouchSensor, {
+    activationConstraint: { delay: 200, tolerance: 5 },
+  });
+  const sensors = useSensors(pointerSensor, touchSensor);
 
   // Elapsed time ticker
   useEffect(() => {
@@ -103,7 +120,6 @@ export function WorkoutLogger() {
           muscleGroup: te.exercise.muscleGroup || "other",
         });
       }
-      // Restore superset groups from template
       const groups = new Map<number, number[]>();
       template.exercises.forEach((te, i) => {
         if (te.supersetGroupId != null) {
@@ -122,13 +138,25 @@ export function WorkoutLogger() {
     [exercises.length, setWorkoutName, addExercise, groupExercises],
   );
 
+  const handleDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      const { active, over } = event;
+      if (!over || active.id === over.id) return;
+      const fromIndex = exercises.findIndex((e) => e.id === active.id);
+      const toIndex = exercises.findIndex((e) => e.id === over.id);
+      if (fromIndex !== -1 && toIndex !== -1) {
+        reorderExercise(fromIndex, toIndex);
+      }
+    },
+    [exercises, reorderExercise],
+  );
+
   const handleFinishWorkout = useCallback(async () => {
     if (saveRef.current) return;
     saveRef.current = true;
     setSaving(true);
 
     try {
-      // 1. Create the workout record
       const workoutRes = await fetch("/api/workouts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -144,12 +172,10 @@ export function WorkoutLogger() {
       const workout = await workoutRes.json();
       const workoutId = workout.id;
 
-      // 2. Add each exercise and its sets
       for (const exercise of exercises) {
         const completedSets = exercise.sets.filter((s) => s.completed);
-        if (completedSets.length === 0) continue; // Skip exercises with no completed sets
+        if (completedSets.length === 0) continue;
 
-        // Add exercise to workout
         const exRes = await fetch(`/api/workouts/${workoutId}/exercises`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -163,7 +189,6 @@ export function WorkoutLogger() {
         if (!exRes.ok) continue;
         const workoutExercise = await exRes.json();
 
-        // Add completed sets
         for (const set of completedSets) {
           await fetch(
             `/api/workouts/${workoutId}/exercises/${workoutExercise.id}/sets`,
@@ -181,7 +206,6 @@ export function WorkoutLogger() {
         }
       }
 
-      // 3. Update workout with duration
       const duration = finishWorkout();
       await fetch(`/api/workouts/${workoutId}`, {
         method: "PUT",
@@ -231,6 +255,20 @@ export function WorkoutLogger() {
     <div className="space-y-4 pb-32">
       {/* Header */}
       <div className="sticky top-0 z-20 bg-background/80 backdrop-blur-lg border-b -mx-4 px-4 py-3">
+        {/* Timer bar */}
+        <div className="flex items-center gap-2 mb-2">
+          <span className="relative flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500" />
+          </span>
+          <span className="text-base font-bold tabular-nums">{elapsed}</span>
+          {totalVolume > 0 && (
+            <span className="text-sm text-muted-foreground ml-auto tabular-nums">
+              {totalVolume.toLocaleString()} kg
+            </span>
+          )}
+        </div>
+
         <div className="flex items-center justify-between gap-3">
           <div className="flex-1 min-w-0">
             <Input
@@ -239,12 +277,6 @@ export function WorkoutLogger() {
               placeholder="Workout name (optional)"
               className="h-8 text-sm font-semibold border-none bg-transparent px-0 focus-visible:ring-0 placeholder:text-muted-foreground/50"
             />
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <div className="flex items-center gap-1.5 text-sm tabular-nums text-muted-foreground">
-              <TimerIcon className="h-3.5 w-3.5" />
-              {elapsed}
-            </div>
           </div>
         </div>
 
@@ -256,51 +288,69 @@ export function WorkoutLogger() {
           <span>
             {completedSetsCount} set{completedSetsCount !== 1 ? "s" : ""}
           </span>
-          {totalVolume > 0 && (
-            <span>{totalVolume.toLocaleString()} kg volume</span>
-          )}
         </div>
       </div>
 
-      {/* Exercise list */}
-      <div className="space-y-3">
-        {exercises.map((ex, i) => {
-          const groupId = ex.supersetGroupId;
-          const isGroupStart =
-            groupId !== null &&
-            (i === 0 || exercises[i - 1].supersetGroupId !== groupId);
-          const isGroupEnd =
-            groupId !== null &&
-            (i === exercises.length - 1 ||
-              exercises[i + 1].supersetGroupId !== groupId);
+      {/* Exercise list with DnD */}
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragEnd={handleDragEnd}
+      >
+        <SortableContext
+          items={exercises.map((e) => e.id)}
+          strategy={verticalListSortingStrategy}
+        >
+          <div className="space-y-3">
+            <AnimatePresence initial={false}>
+              {exercises.map((ex, i) => {
+                const groupId = ex.supersetGroupId;
+                const isGroupStart =
+                  groupId !== null &&
+                  (i === 0 || exercises[i - 1].supersetGroupId !== groupId);
+                const isGroupEnd =
+                  groupId !== null &&
+                  (i === exercises.length - 1 ||
+                    exercises[i + 1].supersetGroupId !== groupId);
 
-          return (
-            <div key={ex.id}>
-              {isGroupStart && (
-                <div className="flex items-center gap-2 mb-1 ml-1">
-                  <span className="text-[10px] font-semibold uppercase tracking-wider text-primary">
-                    Superset
-                  </span>
-                  <div className="flex-1 h-px bg-primary/20" />
-                </div>
-              )}
-              <div
-                className={
-                  groupId !== null
-                    ? `border-l-2 border-primary/30 pl-2 ${!isGroupEnd ? "-mb-1" : ""}`
-                    : ""
-                }
-              >
-                <ExerciseCard
-                  exerciseIndex={i}
-                  isFirst={i === 0}
-                  isLast={i === exercises.length - 1}
-                />
-              </div>
-            </div>
-          );
-        })}
-      </div>
+                return (
+                  <motion.div
+                    key={ex.id}
+                    layout
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, height: 0, marginBottom: 0 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    {isGroupStart && (
+                      <div className="flex items-center gap-2 mb-1 ml-1">
+                        <span className="text-[10px] font-semibold uppercase tracking-wider text-primary">
+                          Superset
+                        </span>
+                        <div className="flex-1 h-px bg-primary/20" />
+                      </div>
+                    )}
+                    <div
+                      className={
+                        groupId !== null
+                          ? `border-l-2 border-primary/30 pl-2 ${!isGroupEnd ? "-mb-1" : ""}`
+                          : ""
+                      }
+                    >
+                      <SortableExerciseCard
+                        id={ex.id}
+                        exerciseIndex={i}
+                        isFirst={i === 0}
+                        isLast={i === exercises.length - 1}
+                      />
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </AnimatePresence>
+          </div>
+        </SortableContext>
+      </DndContext>
 
       {/* Empty state */}
       {exercises.length === 0 && (

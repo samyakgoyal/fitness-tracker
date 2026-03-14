@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import {
   ChevronDown,
   ChevronUp,
+  GripVertical,
   MoreHorizontal,
   Plus,
   Trash2,
@@ -11,6 +12,7 @@ import {
   Link2,
   Unlink,
 } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -30,12 +32,14 @@ interface ExerciseCardProps {
   exerciseIndex: number;
   isFirst: boolean;
   isLast: boolean;
+  dragHandleProps?: Record<string, unknown>;
 }
 
 export function ExerciseCard({
   exerciseIndex,
   isFirst,
   isLast,
+  dragHandleProps,
 }: ExerciseCardProps) {
   const exercises = useWorkoutStore((s) => s.exercises);
   const addSet = useWorkoutStore((s) => s.addSet);
@@ -98,7 +102,6 @@ export function ExerciseCard({
   const handleToggleComplete = (setIndex: number) => {
     const set = exercise.sets[setIndex];
     if (!set.completed) {
-      // In a superset, only start rest timer on the last exercise in the group
       if (!isInSuperset || isLastInSuperset) {
         startRestTimer(restTimerSeconds);
       }
@@ -111,6 +114,14 @@ export function ExerciseCard({
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b bg-muted/30">
         <div className="flex items-center gap-2 min-w-0">
+          {dragHandleProps && (
+            <div
+              {...dragHandleProps}
+              className="cursor-grab active:cursor-grabbing touch-none text-muted-foreground/50 hover:text-muted-foreground transition-colors -ml-1"
+            >
+              <GripVertical className="h-4 w-4" />
+            </div>
+          )}
           <h3 className="font-semibold text-sm truncate">
             {exercise.exerciseName}
           </h3>
@@ -198,8 +209,8 @@ export function ExerciseCard({
         </div>
       )}
 
-      {/* Set header */}
-      <div className="grid grid-cols-[2rem_1fr_4.5rem_4.5rem_2.75rem_2rem] gap-1.5 px-1 py-2 text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
+      {/* Set header — matches new stepper grid */}
+      <div className="grid grid-cols-[2rem_1fr_1fr_1fr_2.75rem_2rem] gap-1 px-1 py-2 text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
         <span className="text-center">Set</span>
         <span className="text-center">Prev</span>
         <span className="text-center">kg</span>
@@ -208,20 +219,29 @@ export function ExerciseCard({
         <span></span>
       </div>
 
-      {/* Sets */}
+      {/* Sets with AnimatePresence */}
       <div className="px-0.5 pb-2 space-y-0.5">
-        {exercise.sets.map((set, setIndex) => (
-          <SetRow
-            key={set.id}
-            set={set}
-            setIndex={setIndex}
-            onUpdate={(data: Partial<WorkoutSet>) =>
-              updateSet(exerciseIndex, setIndex, data)
-            }
-            onToggleComplete={() => handleToggleComplete(setIndex)}
-            onRemove={() => removeSet(exerciseIndex, setIndex)}
-          />
-        ))}
+        <AnimatePresence initial={false}>
+          {exercise.sets.map((set, setIndex) => (
+            <motion.div
+              key={set.id}
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.15 }}
+            >
+              <SetRow
+                set={set}
+                setIndex={setIndex}
+                onUpdate={(data: Partial<WorkoutSet>) =>
+                  updateSet(exerciseIndex, setIndex, data)
+                }
+                onToggleComplete={() => handleToggleComplete(setIndex)}
+                onRemove={() => removeSet(exerciseIndex, setIndex)}
+              />
+            </motion.div>
+          ))}
+        </AnimatePresence>
       </div>
 
       {/* Add set */}

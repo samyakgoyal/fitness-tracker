@@ -21,7 +21,9 @@ export async function GET() {
       await Promise.all([
         prisma.workout.count({ where: { userId } }),
         prisma.workout.count({ where: { userId, date: { gte: startOfWeek } } }),
-        prisma.workout.count({ where: { userId, date: { gte: startOfMonth } } }),
+        prisma.workout.count({
+          where: { userId, date: { gte: startOfMonth } },
+        }),
       ]);
 
     // Calculate streak
@@ -98,8 +100,9 @@ export async function GET() {
     });
 
     const volumeThisWeek = weekSets.reduce(
-      (sum, s) => sum + (s.weight ?? 0) * (s.reps ?? 0),
-      0
+      (sum: number, s: { weight: number | null; reps: number | null }) =>
+        sum + (s.weight ?? 0) * (s.reps ?? 0),
+      0,
     );
 
     return NextResponse.json({
@@ -114,7 +117,7 @@ export async function GET() {
     console.error("Failed to fetch stats:", error);
     return NextResponse.json(
       { error: "Failed to fetch stats" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

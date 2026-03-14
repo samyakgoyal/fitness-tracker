@@ -31,11 +31,13 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       },
     });
 
-    const result = workoutExercises.map((we) => ({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const result = workoutExercises.map((we: any) => ({
       workoutId: we.workout.id,
       workoutName: we.workout.name || "Workout",
       date: we.workout.date.toISOString(),
-      sets: we.sets.map((s) => ({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      sets: we.sets.map((s: any) => ({
         weight: s.weight,
         reps: s.reps,
         rpe: s.rpe,

@@ -1,33 +1,37 @@
 "use client";
 
-import { useRef } from "react";
 import { Check, Flame, Minus, Plus, X } from "lucide-react";
-import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
-import type { WorkoutSet } from "@/lib/hooks/use-workout-store";
 
-interface SetRowProps {
-  set: WorkoutSet;
+export interface EditSet {
+  id: string;
+  isNew?: boolean;
+  weight: number | null;
+  reps: number | null;
+  rpe: number | null;
+  isWarmup: boolean;
+  setNumber: number;
+}
+
+interface EditSetRowProps {
+  set: EditSet;
   setIndex: number;
-  isWarmup?: boolean;
   weightIncrement?: number;
-  onUpdate: (data: Partial<WorkoutSet>) => void;
-  onToggleComplete: () => void;
+  onUpdate: (data: Partial<EditSet>) => void;
   onRemove: () => void;
 }
 
-export function SetRow({
+export function EditSetRow({
   set,
   setIndex,
   weightIncrement = 2.5,
   onUpdate,
-  onToggleComplete,
   onRemove,
-}: SetRowProps) {
-  const weightRef = useRef<HTMLInputElement>(null);
-  const repsRef = useRef<HTMLInputElement>(null);
-
-  const handleNumberInput = (field: "weight" | "reps", value: string) => {
+}: EditSetRowProps) {
+  const handleNumberInput = (
+    field: "weight" | "reps" | "rpe",
+    value: string,
+  ) => {
     if (value === "") {
       onUpdate({ [field]: null });
       return;
@@ -45,23 +49,8 @@ export function SetRow({
     onUpdate({ [field]: next });
   };
 
-  const fillFromGhost = () => {
-    if (set.prevWeight != null || set.prevReps != null) {
-      onUpdate({
-        weight: set.prevWeight ?? set.weight,
-        reps: set.prevReps ?? set.reps,
-      });
-    }
-  };
-
   return (
-    <div
-      className={cn(
-        "grid grid-cols-[2rem_1fr_1fr_1fr_2.75rem_2rem] items-center gap-1 py-1.5 px-1 rounded-lg transition-colors",
-        set.completed && "bg-primary/5",
-        set.isWarmup && "opacity-75",
-      )}
-    >
+    <div className="grid grid-cols-[2rem_1fr_1fr_3rem_2.75rem_2rem] items-center gap-1 py-1.5 px-1 rounded-lg">
       {/* Set number / warmup */}
       <button
         type="button"
@@ -76,22 +65,6 @@ export function SetRow({
         {set.isWarmup ? <Flame className="h-3.5 w-3.5" /> : setIndex + 1}
       </button>
 
-      {/* Previous values (ghost) — tap to fill */}
-      <button
-        type="button"
-        onClick={fillFromGhost}
-        className={cn(
-          "text-xs text-muted-foreground truncate text-center h-10 flex items-center justify-center rounded-md transition-colors",
-          set.prevWeight != null && set.prevReps != null
-            ? "cursor-pointer hover:bg-muted/50 active:bg-muted"
-            : "cursor-default",
-        )}
-      >
-        {set.prevWeight != null && set.prevReps != null
-          ? `${set.prevWeight} × ${set.prevReps}`
-          : "—"}
-      </button>
-
       {/* Weight stepper */}
       <div className="flex items-center h-10">
         <button
@@ -102,7 +75,6 @@ export function SetRow({
           <Minus className="h-3 w-3" />
         </button>
         <input
-          ref={weightRef}
           type="number"
           inputMode="decimal"
           step="any"
@@ -111,12 +83,7 @@ export function SetRow({
           value={set.weight ?? ""}
           onChange={(e) => handleNumberInput("weight", e.target.value)}
           onFocus={(e) => e.target.select()}
-          className={cn(
-            "h-10 w-full border-y bg-transparent px-1 text-center text-sm font-medium",
-            "focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary",
-            "transition-colors [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none",
-            set.completed ? "border-primary/30" : "border-border",
-          )}
+          className="h-10 w-full border-y bg-transparent px-1 text-center text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-colors [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none border-border"
         />
         <button
           type="button"
@@ -137,7 +104,6 @@ export function SetRow({
           <Minus className="h-3 w-3" />
         </button>
         <input
-          ref={repsRef}
           type="number"
           inputMode="numeric"
           min="0"
@@ -146,12 +112,7 @@ export function SetRow({
           value={set.reps ?? ""}
           onChange={(e) => handleNumberInput("reps", e.target.value)}
           onFocus={(e) => e.target.select()}
-          className={cn(
-            "h-10 w-full border-y bg-transparent px-1 text-center text-sm font-medium",
-            "focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary",
-            "transition-colors [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none",
-            set.completed ? "border-primary/30" : "border-border",
-          )}
+          className="h-10 w-full border-y bg-transparent px-1 text-center text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-colors [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none border-border"
         />
         <button
           type="button"
@@ -162,22 +123,24 @@ export function SetRow({
         </button>
       </div>
 
-      {/* Complete toggle with micro-animation */}
-      <motion.button
-        type="button"
-        onClick={onToggleComplete}
-        whileTap={{ scale: 0.9 }}
-        animate={set.completed ? { scale: [1, 1.2, 1] } : {}}
-        transition={{ duration: 0.2 }}
-        className={cn(
-          "h-10 w-11 rounded-md flex items-center justify-center transition-all",
-          set.completed
-            ? "bg-primary text-primary-foreground"
-            : "border border-border hover:border-primary/50 text-muted-foreground hover:text-foreground",
-        )}
-      >
+      {/* RPE */}
+      <input
+        type="number"
+        inputMode="numeric"
+        min="1"
+        max="10"
+        step="0.5"
+        placeholder="—"
+        value={set.rpe ?? ""}
+        onChange={(e) => handleNumberInput("rpe", e.target.value)}
+        onFocus={(e) => e.target.select()}
+        className="h-10 w-full rounded-md border bg-transparent px-1 text-center text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-colors [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none border-border"
+      />
+
+      {/* Completed indicator */}
+      <div className="h-10 w-11 rounded-md flex items-center justify-center bg-primary/10 text-primary">
         <Check className="h-4 w-4" />
-      </motion.button>
+      </div>
 
       {/* Remove */}
       <button

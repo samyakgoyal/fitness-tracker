@@ -10,8 +10,12 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url);
-    const year = parseInt(searchParams.get("year") || new Date().getFullYear().toString());
-    const month = parseInt(searchParams.get("month") || (new Date().getMonth() + 1).toString());
+    const year = parseInt(
+      searchParams.get("year") || new Date().getFullYear().toString(),
+    );
+    const month = parseInt(
+      searchParams.get("month") || (new Date().getMonth() + 1).toString(),
+    );
 
     const startDate = new Date(year, month - 1, 1);
     const endDate = new Date(year, month, 0, 23, 59, 59, 999);
@@ -29,12 +33,17 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    const result = workouts.map((w) => ({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const result = workouts.map((w: any) => ({
       id: w.id,
       name: w.name || "Workout",
       date: w.date.toISOString(),
       exerciseCount: w.exercises.length,
-      setCount: w.exercises.reduce((sum, e) => sum + e.sets.length, 0),
+      setCount: w.exercises.reduce(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (sum: number, e: any) => sum + e.sets.length,
+        0,
+      ),
     }));
 
     return NextResponse.json({ workouts: result });
@@ -42,7 +51,7 @@ export async function GET(request: NextRequest) {
     console.error("Failed to fetch calendar data:", error);
     return NextResponse.json(
       { error: "Failed to fetch calendar data" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
